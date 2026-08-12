@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SARO Fund Utilization & Procurement Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            800: '#0c4a6e',
+                            900: '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; color: black; font-size: 11pt; }
+            .shadow-lg, .shadow-md, .shadow-sm { box-shadow: none !important; }
+            .border { border-color: #cbd5e1 !important; }
+        }
+        .print-only { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white"
+      x-data="saroTracker()"
+      x-init="initApp()">
+
+    <!-- TOP NAVIGATION HEADER -->
+    <header class="bg-slate-900 text-white shadow-md no-print sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-brand-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid font-bold fa-file-invoice-dollar text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight tracking-tight">SARO Fund & Utilization Tracker</h1>
+                    <p class="text-xs text-slate-400">Project Allotment Download & Procurement Management System</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button @click="openSaroModal()" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>New SARO Entry</span>
+                </button>
+                <button @click="openUtilModal()" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold shadow-sm transition">
+                    <i class="fa-solid fa-cart-plus"></i>
+                    <span>Add Utilization</span>
+                </button>
+                <div class="h-6 w-px bg-slate-700 mx-1"></div>
+                <button @click="exportCSV()" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-medium transition" title="Export to CSV">
+                    <i class="fa-solid fa-file-csv text-base"></i>
+                </button>
+                <button @click="resetToSampleData()" class="p-2 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-800 text-xs font-medium transition" title="Reset Sample Data">
+                    <i class="fa-solid fa-rotate text-base"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- DASHBOARD SUMMARY CARDS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <!-- Total Funding -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total SARO Downloads</p>
+                        <h3 class="text-xl font-bold text-slate-900 mt-1" x-text="formatCurrency(getTotalFunding())"></h3>
+                    </div>
+                    <div class="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                        <i class="fa-solid fa-wallet text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center text-xs text-slate-500">
+                    <span class="font-medium text-slate-700" x-text="saroList.length"></span>
+                    <span class="ml-1">Fund Releases</span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500"></div>
+            </div>
+
+            <!-- Actual Utilized -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Actual Utilized</p>
+                        <h3 class="text-xl font-bold text-amber-600 mt-1" x-text="formatCurrency(getTotalUtilized())"></h3>
+                    </div>
+                    <div class="p-2 rounded-lg bg-amber-50 text-amber-600">
+                        <i class="fa-solid fa-receipt text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+                    <span class="font-medium text-slate-700" x-text="utilizationList.length + ' Disbursed'"></span>
+                    <span class="font-semibold text-amber-600" x-text="getOverallUtilizationPercent() + '% Spent'"></span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-amber-500"></div>
+            </div>
+
+            <!-- Upcoming / Earmarked Procurement -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Upcoming Procurements</p>
+                        <h3 class="text-xl font-bold text-purple-600 mt-1" x-text="formatCurrency(getTotalUpcoming())"></h3>
+                    </div>
+                    <div class="p-2 rounded-lg bg-purple-50 text-purple-600">
+                        <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+                    <span class="font-medium text-slate-700" x-text="upcomingList.length + ' Pipeline Items'"></span>
+                    <span class="font-semibold text-purple-600">Earmarked</span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-purple-500"></div>
+            </div>
+
+            <!-- Net Free Balance -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Net Free Balance</p>
+                        <h3 class="text-xl font-bold text-brand-600 mt-1" x-text="formatCurrency(getNetFreeBalance())"></h3>
+                    </div>
+                    <div class="p-2 rounded-lg bg-brand-50 text-brand-600">
+                        <i class="fa-solid fa-scale-balanced text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+                    <span>Uncommitted Fund</span>
+                    <span class="font-semibold text-brand-600" x-text="getNetFreePercent() + '% Free'"></span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-brand-500"></div>
+            </div>
+
+            <!-- Active Object Codes -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Object Codes</p>
+                        <h3 class="text-xl font-bold text-indigo-600 mt-1" x-text="getUniqueObjectCodesCount()"></h3>
+                    </div>
+                    <div class="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+                        <i class="fa-solid fa-list-ol text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center text-xs text-slate-500">
+                    <span>Active Accounts</span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500"></div>
+            </div>
+        </div>
+
+        <!-- NAVIGATION TABS -->
+        <div class="no-print border-b border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4">
+            <nav class="flex space-x-2 sm:space-x-6 overflow-x-auto pb-px">
+                <button @click="activeTab = 'saro'"
+                        :class="activeTab === 'saro' ? 'border-brand-600 text-brand-600 font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 font-medium'"
+                        class="py-3 px-1 border-b-2 text-sm whitespace-nowrap flex items-center space-x-2 transition">
+                    <i class="fa-solid fa-file-lines"></i>
+                    <span>SARO Funding Downloads</span>
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600 font-bold" x-text="saroList.length"></span>
+                </button>
+
+                <button @click="activeTab = 'utilization'"
+                        :class="activeTab === 'utilization' ? 'border-brand-600 text-brand-600 font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 font-medium'"
+                        class="py-3 px-1 border-b-2 text-sm whitespace-nowrap flex items-center space-x-2 transition">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span>Actual Utilization Log</span>
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600 font-bold" x-text="utilizationList.length"></span>
+                </button>
+
+                <button @click="activeTab = 'upcoming'"
+                        :class="activeTab === 'upcoming' ? 'border-purple-600 text-purple-600 font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 font-medium'"
+                        class="py-3 px-1 border-b-2 text-sm whitespace-nowrap flex items-center space-x-2 transition">
+                    <i class="fa-solid fa-hourglass-half"></i>
+                    <span>Upcoming Procurements</span>
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 font-bold" x-text="upcomingList.length"></span>
+                </button>
+
+                <button @click="activeTab = 'ledger'"
+                        :class="activeTab === 'ledger' ? 'border-brand-600 text-brand-600 font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 font-medium'"
+                        class="py-3 px-1 border-b-2 text-sm whitespace-nowrap flex items-center space-x-2 transition">
+                    <i class="fa-solid fa-book"></i>
+                    <span>Balance Ledger Per SARO</span>
+                </button>
+
+                <button @click="activeTab = 'analytics'"
+                        :class="activeTab === 'analytics' ? 'border-brand-600 text-brand-600 font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 font-medium'"
+                        class="py-3 px-1 border-b-2 text-sm whitespace-nowrap flex items-center space-x-2 transition">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Visual Analytics</span>
+                </button>
+            </nav>
+
+            <!-- Quick Search Bar -->
+            <div class="relative w-full sm:w-64 mb-2 sm:mb-0">
+                <input type="text"
+                       x-model="searchTerm"
+                       placeholder="Search particulars, SARO..."
+                       class="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-brand-500 focus:border-brand-500 shadow-sm">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <button x-show="searchTerm" @click="searchTerm = ''" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 1: FUNDING ENTRIES (SARO DOWNLOADS) -->
+        <div x-show="activeTab === 'saro'" class="space-y-4">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800">SARO Funding Entries</h2>
+                        <p class="text-xs text-slate-500">Special Allotment Release Orders with multi-object codes and fund status tracking</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select x-model="saroFilterObjectCode" class="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500">
+                            <option value="">All Object Codes</option>
+                            <template x-for="code in getUniqueObjectCodes()" :key="code">
+                                <option :value="code" x-text="code"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4 font-semibold">SARO No. & Status</th>
+                                <th class="py-3 px-4 font-semibold">Particulars</th>
+                                <th class="py-3 px-4 font-semibold">Object Codes & Allocations</th>
+                                <th class="py-3 px-4 font-semibold text-right">SARO Amount</th>
+                                <th class="py-3 px-4 font-semibold text-right">Utilized</th>
+                                <th class="py-3 px-4 font-semibold text-right">Earmarked</th>
+                                <th class="py-3 px-4 font-semibold text-right">Net Free Bal.</th>
+                                <th class="py-3 px-4 font-semibold text-center">Burn Rate</th>
+                                <th class="py-3 px-4 font-semibold">Remarks</th>
+                                <th class="py-3 px-4 font-semibold text-center no-print">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 font-medium text-slate-700">
+                            <template x-for="saro in filteredSaroList" :key="saro.id">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="py-3 px-4 align-top">
+                                        <div class="font-bold text-slate-900 font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200 inline-block mb-1" x-text="saro.saroNo"></div>
+                                        <div>
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold"
+                                                  :class="{
+                                                      'bg-emerald-100 text-emerald-800': saro.status === 'Active',
+                                                      'bg-amber-100 text-amber-800': saro.status === 'Near Expiry',
+                                                      'bg-slate-200 text-slate-800': saro.status === 'Fully Utilized',
+                                                      'bg-rose-100 text-rose-800': saro.status === 'On Hold'
+                                                  }"
+                                                  x-text="saro.status || 'Active'"></span>
+                                        </div>
+                                        <div class="text-[10px] text-slate-400 mt-1" x-text="'Rel: ' + (saro.date || 'N/A')"></div>
+                                    </td>
+                                    <td class="py-3 px-4 max-w-xs truncate align-top" :title="saro.particulars" x-text="saro.particulars"></td>
+                                    <td class="py-3 px-4 align-top">
+                                        <div class="space-y-1">
+                                            <template x-for="oc in saro.objectCodes" :key="oc.code">
+                                                <div class="flex items-center justify-between bg-indigo-50/70 border border-indigo-100 px-2 py-1 rounded text-[11px]">
+                                                    <span class="font-mono font-bold text-indigo-700" x-text="oc.code"></span>
+                                                    <span class="font-semibold text-slate-700 ml-2" x-text="formatCurrency(oc.amount)"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-right font-bold text-emerald-700 align-top" x-text="formatCurrency(saro.amount)"></td>
+                                    <td class="py-3 px-4 text-right font-medium text-amber-600 align-top" x-text="formatCurrency(getSaroUtilized(saro.saroNo))"></td>
+                                    <td class="py-3 px-4 text-right font-medium text-purple-600 align-top" x-text="formatCurrency(getSaroUpcoming(saro.saroNo))"></td>
+                                    <td class="py-3 px-4 text-right font-bold align-top"
+                                        :class="getSaroNetBalance(saro.saroNo) < 0 ? 'text-red-600' : 'text-slate-900'"
+                                        x-text="formatCurrency(getSaroNetBalance(saro.saroNo))"></td>
+                                    <td class="py-3 px-4 text-center align-top">
+                                        <div class="w-full max-w-[100px] mx-auto">
+                                            <div class="flex justify-between text-[10px] font-semibold mb-1">
+                                                <span x-text="getSaroPercent(saro.saroNo) + '%'"></span>
+                                            </div>
+                                            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                                <div class="h-1.5 rounded-full"
+                                                     :style="'width: ' + Math.min(getSaroPercent(saro.saroNo), 100) + '%'"
+                                                     :class="{
+                                                        'bg-emerald-500': getSaroPercent(saro.saroNo) < 70,
+                                                        'bg-amber-500': getSaroPercent(saro.saroNo) >= 70 && getSaroPercent(saro.saroNo) < 90,
+                                                        'bg-red-500': getSaroPercent(saro.saroNo) >= 90
+                                                     }"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 max-w-xs truncate text-slate-500 text-[11px] align-top" :title="saro.remarks" x-text="saro.remarks || '-'"></td>
+                                    <td class="py-3 px-4 text-center space-x-1 no-print align-top">
+                                        <button @click="openUtilModalWithSaro(saro.saroNo)" class="p-1.5 rounded text-slate-500 hover:text-emerald-600 hover:bg-emerald-50" title="Deduct Utilization">
+                                            <i class="fa-solid fa-minus-circle"></i>
+                                        </button>
+                                        <button @click="openUpcomingModalWithSaro(saro.saroNo)" class="p-1.5 rounded text-slate-500 hover:text-purple-600 hover:bg-purple-50" title="Add Upcoming Procurement">
+                                            <i class="fa-solid fa-clock-rotate-left"></i>
+                                        </button>
+                                        <button @click="viewSaroLedger(saro.saroNo)" class="p-1.5 rounded text-slate-500 hover:text-brand-600 hover:bg-brand-50" title="View Ledger">
+                                            <i class="fa-solid fa-list-check"></i>
+                                        </button>
+                                        <button @click="editSaro(saro)" class="p-1.5 rounded text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" title="Edit SARO">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </button>
+                                        <button @click="deleteSaro(saro.id)" class="p-1.5 rounded text-slate-500 hover:text-red-600 hover:bg-red-50" title="Delete SARO">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+
+                            <tr x-show="filteredSaroList.length === 0">
+                                <td colspan="10" class="py-8 text-center text-slate-400">
+                                    <i class="fa-solid fa-folder-open text-3xl mb-2"></i>
+                                    <p>No SARO funding entries found matching your filters.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot class="bg-slate-100 font-bold border-t border-slate-300 text-slate-800">
+                            <tr>
+                                <td colspan="3" class="py-3 px-4 uppercase text-slate-600">Total Allotments & Net Free Balance:</td>
+                                <td class="py-3 px-4 text-right text-emerald-700" x-text="formatCurrency(getTotalFunding())"></td>
+                                <td class="py-3 px-4 text-right text-amber-600" x-text="formatCurrency(getTotalUtilized())"></td>
+                                <td class="py-3 px-4 text-right text-purple-600" x-text="formatCurrency(getTotalUpcoming())"></td>
+                                <td class="py-3 px-4 text-right text-brand-700" x-text="formatCurrency(getNetFreeBalance())"></td>
+                                <td colspan="3" class="py-3 px-4"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: UTILIZATION & PROCUREMENT LOG -->
+        <div x-show="activeTab === 'utilization'" class="space-y-4">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800">Actual Fund Utilization & Procurement Log</h2>
+                        <p class="text-xs text-slate-500">Disbursed transactions, obligations, and procurement deductions</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select x-model="selectedSaroFilter" class="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500">
+                            <option value="">All Target SARO Funds</option>
+                            <template x-for="saro in saroList" :key="saro.saroNo">
+                                <option :value="saro.saroNo" x-text="saro.saroNo"></option>
+                            </template>
+                        </select>
+                        <button @click="openUtilModal()" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+                            <i class="fa-solid fa-plus mr-1"></i> Add Utilization
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4 font-semibold">Date</th>
+                                <th class="py-3 px-4 font-semibold">SARO Reference</th>
+                                <th class="py-3 px-4 font-semibold">Particulars / Item</th>
+                                <th class="py-3 px-4 font-semibold text-center">Qty</th>
+                                <th class="py-3 px-4 font-semibold text-right">Unit Price</th>
+                                <th class="py-3 px-4 font-semibold text-right">Total Disbursed</th>
+                                <th class="py-3 px-4 font-semibold">Remarks</th>
+                                <th class="py-3 px-4 font-semibold text-center no-print">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 font-medium text-slate-700">
+                            <template x-for="util in filteredUtilizationList" :key="util.id">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="py-3 px-4 font-mono text-slate-500 text-[11px]" x-text="util.date"></td>
+                                    <td class="py-3 px-4 font-mono font-bold text-slate-900" x-text="util.saroNo"></td>
+                                    <td class="py-3 px-4 max-w-xs truncate" :title="util.particulars" x-text="util.particulars"></td>
+                                    <td class="py-3 px-4 text-center font-bold" x-text="util.quantity"></td>
+                                    <td class="py-3 px-4 text-right" x-text="formatCurrency(util.amount)"></td>
+                                    <td class="py-3 px-4 text-right font-bold text-amber-600" x-text="formatCurrency(util.total)"></td>
+                                    <td class="py-3 px-4 text-slate-500 text-[11px] max-w-xs truncate" :title="util.remarks" x-text="util.remarks || '-'"></td>
+                                    <td class="py-3 px-4 text-center space-x-1 no-print">
+                                        <button @click="editUtilization(util)" class="p-1.5 rounded text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" title="Edit">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </button>
+                                        <button @click="deleteUtilization(util.id)" class="p-1.5 rounded text-slate-500 hover:text-red-600 hover:bg-red-50" title="Delete">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+
+                            <tr x-show="filteredUtilizationList.length === 0">
+                                <td colspan="8" class="py-8 text-center text-slate-400">
+                                    <i class="fa-solid fa-cart-arrow-down text-3xl mb-2"></i>
+                                    <p>No utilization entries recorded.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot class="bg-slate-100 font-bold border-t border-slate-300 text-slate-800">
+                            <tr>
+                                <td colspan="5" class="py-3 px-4 uppercase text-slate-600">Total Actual Utilizations:</td>
+                                <td class="py-3 px-4 text-right text-amber-600" x-text="formatCurrency(getFilteredUtilizationTotal())"></td>
+                                <td colspan="2" class="py-3 px-4"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: UPCOMING PROCUREMENTS PIPELINE -->
+        <div x-show="activeTab === 'upcoming'" class="space-y-4">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 bg-purple-50/60 border-b border-purple-100 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-purple-900 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-purple-600"></i>
+                            <span>Upcoming Procurement Pipeline (Earmarked Funds)</span>
+                        </h2>
+                        <p class="text-xs text-purple-700">Planned procurements before actual obligation/disbursement</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button @click="openUpcomingModal()" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1.5">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Add Upcoming Procurement</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-purple-100/50 text-purple-900 uppercase text-[10px] tracking-wider border-b border-purple-200">
+                            <tr>
+                                <th class="py-3 px-4 font-semibold">Target SARO Ref</th>
+                                <th class="py-3 px-4 font-semibold">Particulars / Procurement Plan Item</th>
+                                <th class="py-3 px-4 font-semibold">Target Date / Qtr</th>
+                                <th class="py-3 px-4 font-semibold text-center">Stage / Status</th>
+                                <th class="py-3 px-4 font-semibold text-center">Qty</th>
+                                <th class="py-3 px-4 font-semibold text-right">Est. Unit Price</th>
+                                <th class="py-3 px-4 font-semibold text-right">Est. Total Earmarked</th>
+                                <th class="py-3 px-4 font-semibold">Remarks</th>
+                                <th class="py-3 px-4 font-semibold text-center no-print">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 font-medium text-slate-700">
+                            <template x-for="item in upcomingList" :key="item.id">
+                                <tr class="hover:bg-purple-50/30 transition">
+                                    <td class="py-3 px-4 font-mono font-bold text-slate-900" x-text="item.saroNo"></td>
+                                    <td class="py-3 px-4 max-w-xs truncate font-medium text-slate-800" :title="item.particulars" x-text="item.particulars"></td>
+                                    <td class="py-3 px-4 font-mono text-slate-500 text-[11px]" x-text="item.targetDate || 'TBD'"></td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold"
+                                              :class="{
+                                                  'bg-blue-100 text-blue-800': item.procurementStage === 'PR Preparation',
+                                                  'bg-amber-100 text-amber-800': item.procurementStage === 'PhilGEPS Bidding',
+                                                  'bg-indigo-100 text-indigo-800': item.procurementStage === 'Notice of Award',
+                                                  'bg-purple-100 text-purple-800': item.procurementStage === 'Pending Delivery',
+                                                  'bg-emerald-100 text-emerald-800': item.procurementStage === 'Obligated'
+                                              }"
+                                              x-text="item.procurementStage || 'PR Preparation'"></span>
+                                    </td>
+                                    <td class="py-3 px-4 text-center font-bold" x-text="item.quantity"></td>
+                                    <td class="py-3 px-4 text-right" x-text="formatCurrency(item.estimatedAmount)"></td>
+                                    <td class="py-3 px-4 text-right font-bold text-purple-700" x-text="formatCurrency(item.estimatedTotal)"></td>
+                                    <td class="py-3 px-4 text-slate-500 text-[11px] max-w-xs truncate" :title="item.remarks" x-text="item.remarks || '-'"></td>
+                                    <td class="py-3 px-4 text-center space-x-1 no-print">
+                                        <button @click="convertUpcomingToActual(item)" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold shadow-sm transition" title="Convert to Actual Utilization">
+                                            <i class="fa-solid fa-check mr-0.5"></i> Disburse
+                                        </button>
+                                        <button @click="editUpcoming(item)" class="p-1.5 rounded text-slate-500 hover:text-purple-600 hover:bg-purple-50" title="Edit Upcoming Item">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </button>
+                                        <button @click="deleteUpcoming(item.id)" class="p-1.5 rounded text-slate-500 hover:text-red-600 hover:bg-red-50" title="Delete">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+
+                            <tr x-show="upcomingList.length === 0">
+                                <td colspan="9" class="py-8 text-center text-slate-400">
+                                    <i class="fa-solid fa-hourglass-start text-3xl mb-2 text-purple-300"></i>
+                                    <p>No upcoming procurements logged in the pipeline.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot class="bg-purple-50 font-bold border-t border-purple-200 text-slate-800">
+                            <tr>
+                                <td colspan="6" class="py-3 px-4 uppercase text-purple-900">Total Earmarked Pipeline Funds:</td>
+                                <td class="py-3 px-4 text-right text-purple-700" x-text="formatCurrency(getTotalUpcoming())"></td>
+                                <td colspan="2" class="py-3 px-4"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: UTILIZATION & PROCUREMENT LOG -->
+<!-- ...------- existing code ... -->
+        <!-- TAB 3: LEDGER PER SARO DOWNLOAD -->
+        <div x-show="activeTab === 'ledger'" class="space-y-6">
+            <!-- SARO Selector Card -->
+            <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4 no-print">
+                <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <label class="text-xs font-bold uppercase text-slate-500 whitespace-nowrap">Select SARO Download:</label>
+                    <select x-model="ledgerSaroNo" class="bg-slate-50 border border-slate-300 font-mono font-bold text-xs rounded-lg px-3 py-2 w-full sm:w-80 focus:ring-brand-500 focus:border-brand-500">
+                        <template x-for="saro in saroList" :key="saro.saroNo">
+                            <option :value="saro.saroNo" x-text="saro.saroNo + ' - ' + saro.particulars"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button @click="window.print()" class="px-3.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold shadow-sm flex items-center space-x-1.5">
+                        <i class="fa-solid fa-print text-slate-500"></i>
+                        <span>Print Statement</span>
+                    </button>
+                    <button @click="openUtilModalWithSaro(ledgerSaroNo)" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm flex items-center space-x-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Deduct From This Fund</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Ledger Report Paper -->
+            <template x-if="selectedLedgerSaro">
+                <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-6">
+                    <!-- Statement Header -->
+                    <div class="border-b border-slate-200 pb-6 flex flex-wrap justify-between items-start gap-4">
+                        <div>
+                            <span class="inline-block px-2.5 py-1 rounded bg-slate-100 text-slate-700 font-mono text-xs font-bold mb-2">STATEMENT OF FUND UTILIZATION</span>
+                            <h2 class="text-xl font-bold text-slate-900" x-text="selectedLedgerSaro.particulars"></h2>
+                            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                <span class="text-slate-500">Object Codes:</span>
+                                <template x-for="oc in selectedLedgerSaro.objectCodes" :key="oc.code">
+                                    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-semibold rounded border border-indigo-100" x-text="oc.code + ' (' + formatCurrency(oc.amount) + ')'"></span>
+                                </template>
+                                <span class="text-slate-400 ml-2">| Date Released: <span class="text-slate-700" x-text="selectedLedgerSaro.date"></span></span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-slate-400">SARO Reference No.</div>
+                            <div class="text-lg font-mono font-bold text-slate-900" x-text="selectedLedgerSaro.saroNo"></div>
+                            <div class="text-xs text-slate-500 mt-1" x-text="'Remarks: ' + (selectedLedgerSaro.remarks || 'N/A')"></div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Stats Row for Ledger -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <div>
+                            <div class="text-[11px] font-semibold uppercase text-slate-500">Total Allotment Downloaded</div>
+                            <div class="text-lg font-bold text-emerald-700" x-text="formatCurrency(selectedLedgerSaro.amount)"></div>
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-semibold uppercase text-slate-500">Total Utilization & Procurements</div>
+                            <div class="text-lg font-bold text-amber-600" x-text="formatCurrency(getSaroUtilized(selectedLedgerSaro.saroNo))"></div>
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-semibold uppercase text-slate-500">Net Remaining Balance</div>
+                            <div class="text-lg font-bold" :class="getSaroBalance(selectedLedgerSaro.saroNo) < 0 ? 'text-red-600' : 'text-brand-600'" x-text="formatCurrency(getSaroBalance(selectedLedgerSaro.saroNo))"></div>
+                        </div>
+                    </div>
+
+                    <!-- Transaction Ledger Table -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Itemized Utilization Breakdown & Running Balance</h3>
+                        <div class="overflow-x-auto rounded-lg border border-slate-200">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-100 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-3 px-4 font-semibold">Date</th>
+                                        <th class="py-3 px-4 font-semibold">Particulars / Description</th>
+                                        <th class="py-3 px-4 font-semibold text-center">Qty</th>
+                                        <th class="py-3 px-4 font-semibold text-right">Unit Price</th>
+                                        <th class="py-3 px-4 font-semibold text-right">Deduction (Total)</th>
+                                        <th class="py-3 px-4 font-semibold text-right">Running Balance</th>
+                                        <th class="py-3 px-4 font-semibold">Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <!-- Initial Download Row -->
+                                    <tr class="bg-emerald-50/50 font-medium">
+                                        <td class="py-3 px-4 font-mono text-slate-500" x-text="selectedLedgerSaro.date"></td>
+                                        <td class="py-3 px-4 font-bold text-slate-900" x-text="'INITIAL FUND DOWNLOAD (' + selectedLedgerSaro.saroNo + ')'"></td>
+                                        <td class="py-3 px-4 text-center text-slate-400">-</td>
+                                        <td class="py-3 px-4 text-right text-slate-400">-</td>
+                                        <td class="py-3 px-4 text-right text-emerald-600 font-bold" x-text="'+ ' + formatCurrency(selectedLedgerSaro.amount)"></td>
+                                        <td class="py-3 px-4 text-right font-bold text-slate-900" x-text="formatCurrency(selectedLedgerSaro.amount)"></td>
+                                        <td class="py-3 px-4 text-slate-500 text-[11px]" x-text="selectedLedgerSaro.remarks || 'Allotment Release'"></td>
+                                    </tr>
+
+                                    <!-- Iterative Deductions with Running Balance -->
+                                    <template x-for="(tx, idx) in getSaroLedgerTransactions(selectedLedgerSaro.saroNo)" :key="tx.id">
+                                        <tr class="hover:bg-slate-50 transition font-medium">
+                                            <td class="py-3 px-4 font-mono text-slate-500 text-[11px]" x-text="tx.date"></td>
+                                            <td class="py-3 px-4 text-slate-800" x-text="tx.particulars"></td>
+                                            <td class="py-3 px-4 text-center font-mono" x-text="tx.quantity"></td>
+                                            <td class="py-3 px-4 text-right text-slate-600" x-text="formatCurrency(tx.amount)"></td>
+                                            <td class="py-3 px-4 text-right text-red-600 font-bold" x-text="'- ' + formatCurrency(tx.total)"></td>
+                                            <td class="py-3 px-4 text-right font-bold"
+                                                :class="tx.runningBalance < 0 ? 'text-red-600' : 'text-slate-900'"
+                                                x-text="formatCurrency(tx.runningBalance)"></td>
+                                            <td class="py-3 px-4 text-slate-500 text-[11px]" x-text="tx.remarks || '-'"></td>
+                                        </tr>
+                                    </template>
+
+                                    <tr x-show="getSaroLedgerTransactions(selectedLedgerSaro.saroNo).length === 0">
+                                        <td colspan="7" class="py-6 text-center text-slate-400">
+                                            No utilization entries have been recorded against this SARO download yet.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- TAB 4: VISUAL ANALYTICS & CHARTS -->
+        <div x-show="activeTab === 'analytics'" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Object Code Breakdown Chart -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center justify-between">
+                        <span>Funding vs Utilization by Object Code</span>
+                        <i class="fa-solid fa-chart-bar text-slate-400"></i>
+                    </h3>
+                    <div class="h-64 relative">
+                        <canvas id="objectCodeChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Utilization Ratio Pie Chart -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center justify-between">
+                        <span>Overall Fund Status Ratio</span>
+                        <i class="fa-solid fa-chart-pie text-slate-400"></i>
+                    </h3>
+                    <div class="h-64 relative flex justify-center items-center">
+                        <canvas id="statusPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL 1: ADD / EDIT SARO ENTRY -->
+    <div x-show="showSaroModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all" @click.away="showSaroModal = false">
+            <div class="bg-slate-900 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-base flex items-center space-x-2">
+                    <i class="fa-solid fa-file-circle-plus text-emerald-400"></i>
+                    <span x-text="saroForm.id ? 'Edit SARO Download' : 'Input New SARO Funding Entry'"></span>
+                </h3>
+                <button @click="showSaroModal = false" class="text-slate-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form @submit.prevent="saveSaroForm()" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- SARO Number -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">SARO Number <span class="text-red-500">*</span></label>
+                        <input type="text" x-model="saroForm.saroNo" required placeholder="e.g., SARO-BMB-A-24-000123"
+                               class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono font-semibold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                    </div>
+
+                    <!-- Fund Status -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">SARO Fund Status</label>
+                        <select x-model="saroForm.status"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="Active">Active / On-going</option>
+                            <option value="Near Expiry">Near Expiry / Priority</option>
+                            <option value="Fully Utilized">Fully Utilized</option>
+                            <option value="On Hold">On Hold / Restricted</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Particulars -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Particulars / Project Title <span class="text-red-500">*</span></label>
+                    <textarea x-model="saroForm.particulars" required rows="2" placeholder="Description of the fund release or project allotment"
+                              class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Date Released -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Date Released</label>
+                        <input type="date" x-model="saroForm.date" required
+                               class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Total Fund Amount (PHP)</label>
+                        <div class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-emerald-700"
+                             x-text="formatCurrency(calculateFormSaroTotal())"></div>
+                    </div>
+                </div>
+
+                <!-- Multiple Object Codes Section -->
+                <div class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold uppercase text-slate-700">Object Codes & Allocations <span class="text-red-500">*</span></label>
+                        <button type="button" @click="addObjectCodeRow()" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-brand-600 hover:bg-brand-500 text-white text-[11px] font-semibold transition">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>Add Object Code</span>
+                        </button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <template x-for="(oc, index) in saroForm.objectCodes" :key="index">
+                            <div class="flex items-center space-x-2">
+                                <input type="text" x-model="oc.code" required placeholder="Object Code (e.g., 5-02-03-010)"
+                                       class="flex-1 bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono font-semibold focus:ring-brand-500">
+                                <div class="relative w-36">
+                                    <span class="absolute left-2.5 top-1.5 text-slate-400 text-xs font-bold">₱</span>
+                                    <input type="number" step="0.01" min="0" x-model.number="oc.amount" required placeholder="Amount"
+                                           class="w-full pl-6 bg-white border border-slate-300 rounded px-2 py-1.5 text-xs font-bold text-slate-900 focus:ring-brand-500">
+                                </div>
+                                <button type="button" @click="removeObjectCodeRow(index)" x-show="saroForm.objectCodes.length > 1" class="p-1.5 text-slate-400 hover:text-red-600 transition" title="Remove row">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Remarks -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Remarks</label>
+                    <input type="text" x-model="saroForm.remarks" placeholder="Optional notes, special conditions..."
+                           class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                </div>
+
+                <!-- Actions -->
+                <div class="pt-4 border-t border-slate-200 flex justify-end space-x-2">
+                    <button type="button" @click="showSaroModal = false" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm">Save SARO Funding</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: ADD / EDIT UPCOMING PROCUREMENT ENTRY -->
+    <div x-show="showUpcomingModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all" @click.away="showUpcomingModal = false">
+            <div class="bg-purple-900 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-base flex items-center space-x-2">
+                    <i class="fa-solid fa-hourglass-half text-purple-300"></i>
+                    <span x-text="upcomingForm.id ? 'Edit Upcoming Procurement' : 'Log Upcoming Procurement (Earmark Fund)'"></span>
+                </h3>
+                <button @click="showUpcomingModal = false" class="text-slate-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form @submit.prevent="saveUpcomingForm()" class="p-6 space-y-4">
+                <!-- Target SARO Reference Dropdown -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Target SARO Download <span class="text-red-500">*</span></label>
+                    <select x-model="upcomingForm.saroNo" required
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="" disabled>-- Select Target SARO Download --</option>
+                        <template x-for="saro in saroList" :key="saro.saroNo">
+                            <option :value="saro.saroNo" x-text="saro.saroNo + ' (Free Bal: ' + formatCurrency(getSaroNetBalance(saro.saroNo)) + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <!-- Particulars -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Particulars / Procurement Item <span class="text-red-500">*</span></label>
+                    <textarea x-model="upcomingForm.particulars" required rows="2" placeholder="Planned item description, APP item code, target specs..."
+                              class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Target Date -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Target Bidding/PR Date</label>
+                        <input type="date" x-model="upcomingForm.targetDate"
+                               class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+
+                    <!-- Procurement Stage / Status -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Procurement Stage</label>
+                        <select x-model="upcomingForm.procurementStage"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            <option value="PR Preparation">PR Preparation</option>
+                            <option value="PhilGEPS Bidding">PhilGEPS Bidding</option>
+                            <option value="Notice of Award">Notice of Award</option>
+                            <option value="Pending Delivery">Pending Delivery</option>
+                            <option value="Obligated">Obligated / Contracted</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Quantity, Estimated Unit Amount & Total -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Est. Quantity <span class="text-red-500">*</span></label>
+                        <input type="number" min="1" step="1" x-model.number="upcomingForm.quantity" @input="calculateUpcomingTotal()" required
+                               class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-center font-bold">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Est. Unit Price <span class="text-red-500">*</span></label>
+                        <input type="number" step="0.01" min="0" x-model.number="upcomingForm.estimatedAmount" @input="calculateUpcomingTotal()" required placeholder="0.00"
+                               class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-right font-semibold">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">EARMARKED TOTAL</label>
+                        <div class="w-full bg-purple-50 border border-purple-300 rounded px-2.5 py-1.5 text-xs text-right font-bold text-purple-700"
+                             x-text="formatCurrency(upcomingForm.estimatedTotal || 0)"></div>
+                    </div>
+                </div>
+
+                <!-- Remarks -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Remarks / Notes</label>
+                    <input type="text" x-model="upcomingForm.remarks" placeholder="End-user unit, PPMP item number, notes..."
+                           class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+
+                <!-- Actions -->
+                <div class="pt-4 border-t border-slate-200 flex justify-end space-x-2">
+                    <button type="button" @click="showUpcomingModal = false" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-sm">Save Upcoming Procurement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADD / EDIT UTILIZATION & PROCUREMENT ENTRY -->
+    <div x-show="showUtilModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all" @click.away="showUtilModal = false">
+            <div class="bg-slate-900 px-6 py-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-base flex items-center space-x-2">
+                    <i class="fa-solid fa-cart-shopping text-amber-400"></i>
+                    <span x-text="utilForm.id ? 'Edit Utilization Entry' : 'Deduct Utilized Funds / Procurement'"></span>
+                </h3>
+                <button @click="showUtilModal = false" class="text-slate-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form @submit.prevent="saveUtilForm()" class="p-6 space-y-4">
+                <!-- SARO Reference Dropdown -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Source SARO Download <span class="text-red-500">*</span></label>
+                    <select x-model="utilForm.saroNo" required @change="updateUtilObjectCodeFromSaro()"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                        <option value="" disabled>-- Select Target SARO Download --</option>
+                        <template x-for="saro in saroList" :key="saro.saroNo">
+                            <option :value="saro.saroNo" x-text="saro.saroNo + ' (Bal: ' + formatCurrency(getSaroBalance(saro.saroNo)) + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <!-- Particulars -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Particulars / Procurement Item <span class="text-red-500">*</span></label>
+                    <textarea x-model="utilForm.particulars" required rows="2" placeholder="Item description, PR/PO number, supplier or service details"
+                              class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+                </div>
+
+                <!-- Date -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Transaction Date</label>
+                    <input type="date" x-model="utilForm.date" required
+                           class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                </div>
+
+                <!-- Quantity, Unit Amount & Total -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Quantity <span class="text-red-500">*</span></label>
+                        <input type="number" min="1" step="1" x-model.number="utilForm.quantity" @input="calculateUtilTotal()" required
+                               class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-center font-bold">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Unit Price / Amount <span class="text-red-500">*</span></label>
+                        <input type="number" step="0.01" min="0" x-model.number="utilForm.amount" @input="calculateUtilTotal()" required placeholder="0.00"
+                               class="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-right font-semibold">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">TOTAL DEDUCTION</label>
+                        <div class="w-full bg-amber-50 border border-amber-300 rounded px-2.5 py-1.5 text-xs text-right font-bold text-amber-700"
+                             x-text="formatCurrency(utilForm.total || 0)"></div>
+                    </div>
+                </div>
+
+                <!-- Remarks -->
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Remarks / Reference No.</label>
+                    <input type="text" x-model="utilForm.remarks" placeholder="DV No., OR No., Payee, status notes..."
+                           class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+                </div>
+
+                <!-- Actions -->
+                <div class="pt-4 border-t border-slate-200 flex justify-end space-x-2">
+                    <button type="button" @click="showUtilModal = false" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-sm">Deduct & Save Utilization</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-auto no-print">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+            SARO Fund Download & Utilization Tracker &bull; Project Financial Management System
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT APPLICATION LOGIC -->
+    <script>
+        function saroTracker() {
+            return {
+                activeTab: 'saro',
+                searchTerm: '',
+                selectedSaroFilter: '',
+                saroFilterObjectCode: '',
+                ledgerSaroNo: '',
+
+                showSaroModal: false,
+                showUtilModal: false,
+                showUpcomingModal: false,
+
+                saroForm: {
+                    id: null,
+                    saroNo: '',
+                    status: 'Active',
+                    particulars: '',
+                    objectCodes: [{ code: '', amount: 0 }],
+                    amount: 0,
+                    date: '',
+                    remarks: ''
+                },
+
+                utilForm: {
+                    id: null,
+                    saroNo: '',
+                    particulars: '',
+                    quantity: 1,
+                    amount: 0,
+                    total: 0,
+                    date: '',
+                    remarks: ''
+                },
+
+                upcomingForm: {
+                    id: null,
+                    saroNo: '',
+                    particulars: '',
+                    quantity: 1,
+                    estimatedAmount: 0,
+                    estimatedTotal: 0,
+                    targetDate: '',
+                    procurementStage: 'PR Preparation',
+                    remarks: ''
+                },
+
+                saroList: [],
+                utilizationList: [],
+                upcomingList: [],
+
+                chartObjectCode: null,
+                chartStatus: null,
+
+                initApp() {
+                    const savedSaro = localStorage.getItem('saro_tracker_saro_list_v2');
+                    const savedUtil = localStorage.getItem('saro_tracker_util_list_v2');
+                    const savedUpcoming = localStorage.getItem('saro_tracker_upcoming_list_v1');
+
+                    if (savedSaro && savedUtil) {
+                        this.saroList = JSON.parse(savedSaro);
+                        this.utilizationList = JSON.parse(savedUtil);
+                        this.upcomingList = savedUpcoming ? JSON.parse(savedUpcoming) : [];
+                    } else {
+                        this.loadSampleData();
+                    }
+
+                    if (this.saroList.length > 0) {
+                        this.ledgerSaroNo = this.saroList[0].saroNo;
+                    }
+
+                    this.$watch('saroList', () => this.saveToStorage());
+                    this.$watch('utilizationList', () => this.saveToStorage());
+                    this.$watch('upcomingList', () => this.saveToStorage());
+                    this.$watch('activeTab', (tab) => {
+                        if (tab === 'analytics') {
+                            this.$nextTick(() => this.renderCharts());
+                        }
+                    });
+                },
+
+                saveToStorage() {
+                    localStorage.setItem('saro_tracker_saro_list_v2', JSON.stringify(this.saroList));
+                    localStorage.setItem('saro_tracker_util_list_v2', JSON.stringify(this.utilizationList));
+                    localStorage.setItem('saro_tracker_upcoming_list_v1', JSON.stringify(this.upcomingList));
+                },
+
+                loadSampleData() {
+                    this.saroList = [
+                        {
+                            id: 1,
+                            saroNo: 'SARO-BMB-A-24-000101',
+                            status: 'Active',
+                            particulars: 'ICT Infrastructure Modernization & High-Performance Servers Procurement',
+                            objectCodes: [
+                                { code: '5-02-13-000', amount: 1000000 },
+                                { code: '5-02-03-010', amount: 500000 }
+                            ],
+                            amount: 1500000,
+                            date: '2026-01-15',
+                            remarks: 'Downloaded for Q1 Hardware & Supplies Refresh'
+                        },
+                        {
+                            id: 2,
+                            saroNo: 'SARO-BMB-A-24-000102',
+                            status: 'Near Expiry',
+                            particulars: 'Office Supplies and Consumables for Regional Project Offices',
+                            objectCodes: [
+                                { code: '5-02-03-010', amount: 450000 }
+                            ],
+                            amount: 450000,
+                            date: '2026-02-01',
+                            remarks: 'Regular operational allocation'
+                        },
+                        {
+                            id: 3,
+                            saroNo: 'SARO-BMB-A-24-000103',
+                            status: 'Active',
+                            particulars: 'Capacity Building Seminars & Training Workshops for Project Managers',
+                            objectCodes: [
+                                { code: '5-02-02-010', amount: 600000 },
+                                { code: '5-02-99-990', amount: 200000 }
+                            ],
+                            amount: 800000,
+                            date: '2026-02-20',
+                            remarks: 'Target completion Q3 2026'
+                        }
+                    ];
+
+                    this.utilizationList = [
+                        {
+                            id: 101,
+                            saroNo: 'SARO-BMB-A-24-000101',
+                            particulars: 'Procurement of 5 Units Rackmountable Enterprise Servers',
+                            quantity: 5,
+                            amount: 180000,
+                            total: 900000,
+                            date: '2026-02-05',
+                            remarks: 'PO-2026-0012, Supplier: TechCore Inc.'
+                        },
+                        {
+                            id: 102,
+                            saroNo: 'SARO-BMB-A-24-000101',
+                            particulars: 'Network Switches and Fiber Optic Transceivers',
+                            quantity: 10,
+                            amount: 25000,
+                            total: 250000,
+                            date: '2026-02-18',
+                            remarks: 'DV-2026-02-88'
+                        }
+                    ];
+
+                    this.upcomingList = [
+                        {
+                            id: 201,
+                            saroNo: 'SARO-BMB-A-24-000101',
+                            particulars: 'Enterprise Uninterruptible Power Supply (UPS) System',
+                            quantity: 2,
+                            estimatedAmount: 100000,
+                            estimatedTotal: 200000,
+                            targetDate: '2026-04-15',
+                            procurementStage: 'PhilGEPS Bidding',
+                            remarks: 'In PhilGEPS bidding phase'
+                        },
+                        {
+                            id: 202,
+                            saroNo: 'SARO-BMB-A-24-000102',
+                            particulars: 'Q2 Paper & Printer Ink Bulk Procurement',
+                            quantity: 1,
+                            estimatedAmount: 150000,
+                            estimatedTotal: 150000,
+                            targetDate: '2026-03-25',
+                            procurementStage: 'PR Preparation',
+                            remarks: 'PR submitted for approval'
+                        }
+                    ];
+
+                    this.saveToStorage();
+                    if (this.saroList.length > 0) this.ledgerSaroNo = this.saroList[0].saroNo;
+                },
+
+                // UPCOMING & BALANCES COMPUTATIONS
+                getTotalUpcoming() {
+                    return this.upcomingList.reduce((sum, item) => sum + (parseFloat(item.estimatedTotal) || 0), 0);
+                },
+
+                getSaroUpcoming(saroNo) {
+                    return this.upcomingList
+                        .filter(u => u.saroNo === saroNo)
+                        .reduce((sum, u) => sum + (parseFloat(u.estimatedTotal) || 0), 0);
+                },
+
+                getSaroNetBalance(saroNo) {
+                    const saro = this.saroList.find(s => s.saroNo === saroNo);
+                    if (!saro) return 0;
+                    const allocated = (parseFloat(saro.amount) || 0);
+                    const spent = this.getSaroUtilized(saroNo);
+                    const earmarked = this.getSaroUpcoming(saroNo);
+                    return allocated - spent - earmarked;
+                },
+
+                getNetFreeBalance() {
+                    return this.getTotalFunding() - this.getTotalUtilized() - this.getTotalUpcoming();
+                },
+
+                getNetFreePercent() {
+                    const total = this.getTotalFunding();
+                    if (!total) return 0;
+                    return Math.max(0, Math.round((this.getNetFreeBalance() / total) * 100));
+                },
+
+                // UPCOMING ACTIONS
+                openUpcomingModal() {
+                    if (this.saroList.length === 0) {
+                        alert('Please add at least one SARO Funding Entry first.');
+                        return;
+                    }
+                    this.upcomingForm = {
+                        id: null,
+                        saroNo: this.saroList[0].saroNo,
+                        particulars: '',
+                        quantity: 1,
+                        estimatedAmount: 0,
+                        estimatedTotal: 0,
+                        targetDate: new Date().toISOString().split('T')[0],
+                        procurementStage: 'PR Preparation',
+                        remarks: ''
+                    };
+                    this.showUpcomingModal = true;
+                },
+
+                openUpcomingModalWithSaro(saroNo) {
+                    this.openUpcomingModal();
+                    this.upcomingForm.saroNo = saroNo;
+                },
+
+                editUpcoming(item) {
+                    this.upcomingForm = JSON.parse(JSON.stringify(item));
+                    this.showUpcomingModal = true;
+                },
+
+                calculateUpcomingTotal() {
+                    const qty = parseFloat(this.upcomingForm.quantity) || 0;
+                    const price = parseFloat(this.upcomingForm.estimatedAmount) || 0;
+                    this.upcomingForm.estimatedTotal = qty * price;
+                },
+
+                saveUpcomingForm() {
+                    this.calculateUpcomingTotal();
+
+                    if (this.upcomingForm.id) {
+                        const idx = this.upcomingList.findIndex(u => u.id === this.upcomingForm.id);
+                        if (idx !== -1) {
+                            this.upcomingList[idx] = { ...this.upcomingForm };
+                        }
+                    } else {
+                        this.upcomingList.push({
+                            ...this.upcomingForm,
+                            id: Date.now()
+                        });
+                    }
+                    this.showUpcomingModal = false;
+                },
+
+                deleteUpcoming(id) {
+                    if (confirm('Are you sure you want to remove this upcoming procurement entry?')) {
+                        this.upcomingList = this.upcomingList.filter(u => u.id !== id);
+                    }
+                },
+
+                convertUpcomingToActual(item) {
+                    // Pre-fill utilization form with the upcoming procurement details
+                    this.utilForm = {
+                        id: null,
+                        saroNo: item.saroNo,
+                        particulars: item.particulars,
+                        quantity: item.quantity,
+                        amount: item.estimatedAmount,
+                        total: item.estimatedTotal,
+                        date: new Date().toISOString().split('T')[0],
+                        remarks: 'Disbursed from upcoming pipeline: ' + (item.remarks || '')
+                    };
+
+                    // Automatically delete from upcoming after conversion confirmation
+                    this.showUtilModal = true;
+                    // We attach a temporary field so saveUtilForm knows to clear it from upcoming
+                    this.utilForm._convertedFromUpcomingId = item.id;
+                },
+
+                // OVERRIDDEN / ENHANCED SAVE UTIL FORM
+                saveUtilForm() {
+                    this.calculateUtilTotal();
+
+                    const bal = this.getSaroBalance(this.utilForm.saroNo);
+                    let previousTotal = 0;
+                    if (this.utilForm.id) {
+                        const existing = this.utilizationList.find(u => u.id === this.utilForm.id);
+                        if (existing && existing.saroNo === this.utilForm.saroNo) {
+                            previousTotal = parseFloat(existing.total) || 0;
+                        }
+                    }
+
+                    const netBalanceAfter = bal + previousTotal - this.utilForm.total;
+                    if (netBalanceAfter < 0) {
+                        if (!confirm(`Warning: This utilization (₱${this.utilForm.total.toLocaleString()}) exceeds the available SARO balance by ₱${Math.abs(netBalanceAfter).toLocaleString()}. Do you wish to proceed?`)) {
+                            return;
+                        }
+                    }
+
+                    if (this.utilForm.id) {
+                        const idx = this.utilizationList.findIndex(u => u.id === this.utilForm.id);
+                        if (idx !== -1) {
+                            this.utilizationList[idx] = { ...this.utilForm };
+                        }
+                    } else {
+                        this.utilizationList.push({
+                            ...this.utilForm,
+                            id: Date.now()
+                        });
+                    }
+
+                    // If converted from upcoming pipeline, remove from upcomingList
+                    if (this.utilForm._convertedFromUpcomingId) {
+                        this.upcomingList = this.upcomingList.filter(u => u.id !== this.utilForm._convertedFromUpcomingId);
+                    }
+
+                    this.showUtilModal = false;
+                },
+
+                openSaroModal() {
+                    this.saroForm = {
+                        id: null,
+                        saroNo: 'SARO-BMB-A-24-000' + (this.saroList.length + 101),
+                        status: 'Active',
+                        particulars: '',
+                        objectCodes: [{ code: '5-02-03-010', amount: 0 }],
+                        amount: 0,
+                        date: new Date().toISOString().split('T')[0],
+                        remarks: ''
+                    };
+                    this.showSaroModal = true;
+                },
+
+                renderCharts() {
+                    const ctxBar = document.getElementById('objectCodeChart');
+                    const ctxPie = document.getElementById('statusPieChart');
+
+                    if (!ctxBar || !ctxPie) return;
+
+                    if (this.chartObjectCode) this.chartObjectCode.destroy();
+                    if (this.chartStatus) this.chartStatus.destroy();
+
+                    const codes = this.getUniqueObjectCodes();
+                    const fundingByCode = codes.map(code => {
+                        let sumCode = 0;
+                        this.saroList.forEach(s => {
+                            if (s.objectCodes) {
+                                s.objectCodes.forEach(oc => {
+                                    if (oc.code === code) sumCode += parseFloat(oc.amount) || 0;
+                                });
+                            } else if (s.objectCode === code) {
+                                sumCode += parseFloat(s.amount) || 0;
+                            }
+                        });
+                        return sumCode;
+                    });
+
+                    const utilizationByCode = codes.map((code, idx) => fundingByCode[idx] * (this.getTotalUtilized() / (this.getTotalFunding() || 1)));
+
+                    this.chartObjectCode = new Chart(ctxBar, {
+                        type: 'bar',
+                        data: {
+                            labels: codes,
+                            datasets: [
+                                {
+                                    label: 'Allotted Fund',
+                                    data: fundingByCode,
+                                    backgroundColor: '#10b981'
+                                },
+                                {
+                                    label: 'Actual Utilization',
+                                    data: utilizationByCode,
+                                    backgroundColor: '#f59e0b'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom' }
+                            }
+                        }
+                    });
+
+                    this.chartStatus = new Chart(ctxPie, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Actual Disbursed', 'Upcoming Earmarked', 'Net Uncommitted Free Balance'],
+                            datasets: [{
+                                data: [
+                                    this.getTotalUtilized(),
+                                    this.getTotalUpcoming(),
+                                    Math.max(0, this.getNetFreeBalance())
+                                ],
+                                backgroundColor: ['#f59e0b', '#a855f7', '#0284c7']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom' }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
